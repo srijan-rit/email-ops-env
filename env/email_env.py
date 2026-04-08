@@ -1,79 +1,77 @@
-import uuid
-from typing import Tuple
-from env.models import Observation, Action, StepResult
-from env.tasks import load_task
-from env.graders import grade_task
+from typing import List
+from .models import Observation, Action, Email
+from .tasks import generate_emails
+from .graders import grade_easy, grade_medium, grade_hard
 
 
 class EmailOpsEnv:
 
-    def __init__(self, task_name: str):
+    def __init__(self, task_name="spam_filter_easy"):
         self.task_name = task_name
-        self.state = None
-        self.steps = 0
-        self.max_steps = 20
+        self.emails: List[Email] = []
+        self.step_count = 0
+        self.max_steps = 10
 
-    async def reset(self) -> StepResult:
-        self.state = load_task(self.task_name)
-        self.steps = 0
+    async def reset(self):
+        self.emails = generate_emails(self.task_name)
+        self.step_count = 0
 
-        obs = Observation(
-            inbox=self.state["emails"],
-            echoed_message="Environment reset"
-        )
+        return self._get_obs(0.0, False)
 
-        return StepResult(observation=obs, reward=0.0, done=False)
-
-    async def step(self, action: Action) -> StepResult:
-        self.steps += 1
+    async def step(self, action: Action):
+        self.step_count += 1
         reward = 0.0
 
-        emails = self.state["emails"]
+        email = next((e for e in self.emails if e.id == action.email_id), None)
 
-        # Apply action
-        if action.action_type == "archive":
-            for e in emails:
-                if e.id == action.email_id:
-                    if e.is_spam:
-                        reward += 0.2
-                    else:
-                        reward -= 0.3
-                    e.archived = True
+        if email:
+            if action.action_type == "archive":
+                email.archived = True
+                reward = 0.3 if email.category == "spam" else -0.2
 
-        elif action.action_type == "classify":
-            for e in emails:
-                if e.id == action.email_id:
-                    if e.category == action.content:
-                        reward += 0.2
-                    else:
-                        reward -= 0.2
+            elif action.action_type == "send_reply":
+                email.replied = True
+                reward = 0.3 if email.category != "spam" else -0.3
 
-        elif action.action_type == "draft_reply":
-            reward += 0.1
+        reward = max(min(reward, 1.0), -1.0)
 
-        elif action.action_type == "send_reply":
-            for e in emails:
-                if e.id == action.email_id:
-                    e.replied = True
-                    reward += 0.3
+        done = self.step_count >= self.max_steps or self._all_done()
 
-        # Done condition
-        done = self.steps >= self.max_steps
-
-        # Final grading bonus
         if done:
-            final_score = grade_task(self.task_name, self.state)
-            reward += final_score
+            final_score = self._grade()
+            return self._get_obs(final_score, True)
 
-        obs = Observation(
-            inbox=emails,
-            echoed_message=f"Step {self.steps} executed"
-        )
+        return self._get_obs(reward, False)
 
-        return StepResult(observation=obs, reward=reward, done=done)
+    def _all_done(self):
+        return all(e.archived or e.replied for e in self.emails)
 
-    async def state(self):
-        return self.state
+    def _grade(self):
+        if self.task_name == "spam_filter_easy":
+            return grade_easy(self.emails)
+        elif self.task_name == "priority_inbox":
+            return grade_medium(self.emails)
+        else:
+            return grade_hard(self.emails)
+
+    def _get_obs(self, reward, done):
+        return {
+            "observation": Observation(
+                inbox=self.emails,
+                current_email_id=None,
+                draft_response=None,
+                echoed_message=f"Step {self.step_count}"
+            ),
+            "reward": reward,
+            "done": done,
+            "info": {}
+        }
+
+    def state(self):
+        return {
+            "remaining": len([e for e in self.emails if not (e.archived or e.replied)]),
+            "step": self.step_count
+        }
 
     async def close(self):
         pass
