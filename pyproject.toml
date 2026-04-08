@@ -1,0 +1,18 @@
+[project]
+name = "email_ops_env"
+version = "0.1.0"
+description = "Email Operations OpenEnv Environment"
+authors = [{name = "Your Name"}]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "openai",
+    "openenv-core>=0.2.0"
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.openenv]
+entry_point = "env.email_env:EmailOpsEnv"

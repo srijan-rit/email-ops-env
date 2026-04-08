@@ -21,4 +21,4 @@ RUN pip install --upgrade pip && \
 EXPOSE 7860
 
 # run server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
