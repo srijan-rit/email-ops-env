@@ -1,0 +1,14 @@
+name: email_ops_env
+version: 1.0
+description: Email operations simulation environment
+
+entrypoint: server:app
+
+tasks:
+  - spam_filter
+  - customer_support
+  - multi_step
+
+observation_space: Observation
+action_space: Action
+reward_range: [0.0, 1.0]
