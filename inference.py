@@ -73,7 +73,7 @@ async def main():
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0
             )
-            print(response)
+            # print(response)
 
             content = response.choices[0].message.content.strip()
 
